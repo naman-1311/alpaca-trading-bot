@@ -1,3 +1,7 @@
+
+
+
+
 import os
 import yfinance as yf
 import pandas as pd
@@ -8,7 +12,7 @@ warnings.filterwarnings("ignore")
 from alpaca_trade_api import REST
 
 # ======================================================
-# ALPACA CONFIG (FROM ENV VARIABLES)
+# ALPACA CONFIG (ENV VARIABLES)
 # ======================================================
 ALPACA_API_KEY = os.getenv("PKU7NHFZQJZ665JLHO4YQAUJAS")
 ALPACA_SECRET_KEY = os.getenv("G3U4uRew9jfcq7ZAW4g9sJjyNmygoz4wZL7V5kK1AW3X")
@@ -16,7 +20,34 @@ ALPACA_BASE_URL = os.getenv("ALPACA_BASE_URL")
 
 alpaca = REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, ALPACA_BASE_URL, api_version="v2")
 
-PAPER_TRADE_MODE = True   # True = send Alpaca paper trades
+PAPER_TRADE_MODE = True
+
+# ======================================================
+# SAFETY UTILITIES
+# ======================================================
+def market_is_ready(api):
+    clock = api.get_clock()
+
+    if not clock.is_open:
+        print("❌ Market is closed. Exiting.")
+        return False
+
+    minutes_left = (clock.next_close - clock.timestamp).total_seconds() / 60
+    print(f"⏰ Minutes to close: {round(minutes_left,2)}")
+
+    if minutes_left > 15:
+        print("⚠️ Too early before close. Exiting safely.")
+        return False
+
+    return True
+
+
+def get_current_position():
+    positions = alpaca.list_positions()
+    if len(positions) == 0:
+        return "CASH"
+    return positions[0].symbol
+
 
 # ======================================================
 # ALPACA ORDER FUNCTION
@@ -25,12 +56,12 @@ def alpaca_trade(symbol, side, qty):
     try:
         alpaca.submit_order(
             symbol=symbol,
-            qty=int(qty),
+            qty=int(float(qty)),
             side=side,
             type="market",
             time_in_force="day"
         )
-        print(f"📈 ALPACA PAPER ORDER: {side.upper()} {int(qty)} {symbol}")
+        print(f"📈 ALPACA ORDER: {side.upper()} {int(float(qty))} {symbol}")
     except Exception as e:
         print("❌ Alpaca Order Error:", e)
 
@@ -71,22 +102,22 @@ class MA9_14_19_TradeLog:
         df["Reason"] = ""
 
         for i in range(len(df)):
-            price = df["TQQQ_Close"].iloc[i]
+            p = df["TQQQ_Close"].iloc[i]
             ma9 = df["MA9"].iloc[i]
             ma14 = df["MA14"].iloc[i]
             ma19 = df["MA19"].iloc[i]
 
-            if price > ma19:
+            if p > ma19:
                 df.iloc[i, df.columns.get_loc("Signal")] = "TQQQ"
-                df.iloc[i, df.columns.get_loc("Reason")] = f"Price {price:.2f} > MA19 {ma19:.2f}"
+                df.iloc[i, df.columns.get_loc("Reason")] = f"Price {p:.2f} > MA19 {ma19:.2f}"
 
-            elif price < ma14:
+            elif p < ma14:
                 df.iloc[i, df.columns.get_loc("Signal")] = "CASH"
-                df.iloc[i, df.columns.get_loc("Reason")] = f"Price {price:.2f} < MA14 {ma14:.2f}"
+                df.iloc[i, df.columns.get_loc("Reason")] = f"Price {p:.2f} < MA14 {ma14:.2f}"
 
-            elif price < ma9:
+            elif p < ma9:
                 df.iloc[i, df.columns.get_loc("Signal")] = "SQQQ"
-                df.iloc[i, df.columns.get_loc("Reason")] = f"Price {price:.2f} < MA9 {ma9:.2f}"
+                df.iloc[i, df.columns.get_loc("Reason")] = f"Price {p:.2f} < MA9 {ma9:.2f}"
 
         df["MA9_prev"] = df["MA9"].shift(1)
         df["MA14_prev"] = df["MA14"].shift(1)
@@ -99,34 +130,14 @@ class MA9_14_19_TradeLog:
 
         return df
 
-    def execute_backtest(self, df):
-
-        for i in range(len(df)-1):
-            signal = df["Signal"].iloc[i]
-            next_tqqq = df["TQQQ_Open"].iloc[i+1]
-            next_sqqq = df["SQQQ_Open"].iloc[i+1]
-
-            if signal != self.position:
-
-                if self.position == "TQQQ":
-                    self.portfolio_value = self.shares * next_tqqq
-                elif self.position == "SQQQ":
-                    self.portfolio_value = self.shares * next_sqqq
-
-                if signal == "TQQQ":
-                    self.shares = self.portfolio_value / next_tqqq
-                elif signal == "SQQQ":
-                    self.shares = self.portfolio_value / next_sqqq
-                else:
-                    self.shares = 0
-
-                self.position = signal
-
 
 # ======================================================
 # LIVE EXECUTION
 # ======================================================
 def execute_today_trade(df, strategy):
+
+    if not market_is_ready(alpaca):
+        return
 
     last = df.iloc[-1]
 
@@ -150,15 +161,15 @@ def execute_today_trade(df, strategy):
     if not PAPER_TRADE_MODE:
         return
 
-    positions = alpaca.list_positions()
-    current = [p.symbol for p in positions]
+    current_position = get_current_position()
+    print("📌 Current Alpaca Position:", current_position)
 
-    if signal in current or (signal == "CASH" and len(current)==0):
-        print("✓ Already aligned with signal.")
+    if signal == current_position:
+        print("✓ Signal equals current position. No trade.")
         return
 
-    for p in positions:
-        alpaca_trade(p.symbol, "sell", p.qty)
+    if current_position != "CASH":
+        alpaca_trade(current_position, "sell", alpaca.get_position(current_position).qty)
 
     if signal == "TQQQ":
         alpaca_trade("TQQQ", "buy", strategy.portfolio_value / price)
@@ -175,18 +186,16 @@ def execute_today_trade(df, strategy):
 # ======================================================
 def main():
 
-    print("\nMA9/14/19 STRATEGY — EXPLAINABLE ALPACA BOT")
+    print("\nMA9/14/19 STRATEGY — PROFESSIONAL CLOUD BOT")
 
     strategy = MA9_14_19_TradeLog()
 
     df = strategy.fetch_data()
     df = strategy.calculate_signals(df)
 
-    strategy.execute_backtest(df)
-
     execute_today_trade(df, strategy)
 
-    print("\n✅ DONE")
+    print("\n✅ BOT EXECUTION COMPLETE")
 
 
 if __name__ == "__main__":
