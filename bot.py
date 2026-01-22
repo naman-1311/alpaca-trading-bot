@@ -14,9 +14,14 @@ from alpaca_trade_api import REST
 # ======================================================
 # ALPACA CONFIG (ENV VARIABLES)
 # ======================================================
-ALPACA_API_KEY = os.getenv("PKU7NHFZQJZ665JLHO4YQAUJAS")
-ALPACA_SECRET_KEY = os.getenv("G3U4uRew9jfcq7ZAW4g9sJjyNmygoz4wZL7V5kK1AW3X")
+ALPACA_API_KEY = os.getenv("ALPACA_API_KEY")
+ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
 ALPACA_BASE_URL = os.getenv("ALPACA_BASE_URL")
+
+# DEBUG (temporary)
+print("API KEY PRESENT:", ALPACA_API_KEY is not None)
+print("SECRET PRESENT:", ALPACA_SECRET_KEY is not None)
+print("BASE URL:", ALPACA_BASE_URL)
 
 alpaca = REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, ALPACA_BASE_URL, api_version="v2")
 
