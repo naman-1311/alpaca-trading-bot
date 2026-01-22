@@ -2,7 +2,7 @@ name: Alpaca Trading Bot
 
 on:
   schedule:
-    - cron: "23 13 * * *"   # 6:53 PM IST
+    - cron: "45 19 * * 1-5"   # 3:45 PM US ET (15 min before close)
   workflow_dispatch:
 
 jobs:
