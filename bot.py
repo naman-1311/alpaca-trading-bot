@@ -1,5 +1,4 @@
-
-
+import os
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
@@ -9,11 +8,11 @@ warnings.filterwarnings("ignore")
 from alpaca_trade_api import REST
 
 # ======================================================
-# ALPACA CONFIG
+# ALPACA CONFIG (FROM ENV VARIABLES)
 # ======================================================
-ALPACA_API_KEY = "PKU7NHFZQJZ665JLHO4YQAUJAS"
-ALPACA_SECRET_KEY = "G3U4uRew9jfcq7ZAW4g9sJjyNmygoz4wZL7V5kK1AW3X"
-ALPACA_BASE_URL = "https://paper-api.alpaca.markets"
+ALPACA_API_KEY = os.getenv("PKU7NHFZQJZ665JLHO4YQAUJAS")
+ALPACA_SECRET_KEY = os.getenv("G3U4uRew9jfcq7ZAW4g9sJjyNmygoz4wZL7V5kK1AW3X")
+ALPACA_BASE_URL = os.getenv("ALPACA_BASE_URL")
 
 alpaca = REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, ALPACA_BASE_URL, api_version="v2")
 
@@ -79,38 +78,24 @@ class MA9_14_19_TradeLog:
 
             if price > ma19:
                 df.iloc[i, df.columns.get_loc("Signal")] = "TQQQ"
-                df.iloc[i, df.columns.get_loc("Reason")] = (
-                    f"Price {price:.2f} > MA19 {ma19:.2f} → Strong uptrend"
-                )
+                df.iloc[i, df.columns.get_loc("Reason")] = f"Price {price:.2f} > MA19 {ma19:.2f}"
 
             elif price < ma14:
                 df.iloc[i, df.columns.get_loc("Signal")] = "CASH"
-                df.iloc[i, df.columns.get_loc("Reason")] = (
-                    f"Price {price:.2f} < MA14 {ma14:.2f} → Weak trend → Stay in cash"
-                )
+                df.iloc[i, df.columns.get_loc("Reason")] = f"Price {price:.2f} < MA14 {ma14:.2f}"
 
             elif price < ma9:
                 df.iloc[i, df.columns.get_loc("Signal")] = "SQQQ"
-                df.iloc[i, df.columns.get_loc("Reason")] = (
-                    f"Price {price:.2f} < MA9 {ma9:.2f} → Down momentum → SQQQ"
-                )
+                df.iloc[i, df.columns.get_loc("Reason")] = f"Price {price:.2f} < MA9 {ma9:.2f}"
 
         df["MA9_prev"] = df["MA9"].shift(1)
         df["MA14_prev"] = df["MA14"].shift(1)
 
         for i in range(1, len(df)):
-            if (
-                df["MA9"].iloc[i] > df["MA14"].iloc[i]
-                and df["MA9_prev"].iloc[i] <= df["MA14_prev"].iloc[i]
-                and df["Signal"].iloc[i] == "SQQQ"
-            ):
-                ma9 = df["MA9"].iloc[i]
-                ma14 = df["MA14"].iloc[i]
-
-                df.iloc[i, df.columns.get_loc("Signal")] = "CASH"
-                df.iloc[i, df.columns.get_loc("Reason")] = (
-                    f"MA9 {ma9:.2f} crossed above MA14 {ma14:.2f} → Exit SQQQ"
-                )
+            if df["MA9"].iloc[i] > df["MA14"].iloc[i] and df["MA9_prev"].iloc[i] <= df["MA14_prev"].iloc[i]:
+                if df["Signal"].iloc[i] == "SQQQ":
+                    df.iloc[i, df.columns.get_loc("Signal")] = "CASH"
+                    df.iloc[i, df.columns.get_loc("Reason")] = "MA9 crossed above MA14 → Exit SQQQ"
 
         return df
 
@@ -176,12 +161,10 @@ def execute_today_trade(df, strategy):
         alpaca_trade(p.symbol, "sell", p.qty)
 
     if signal == "TQQQ":
-        qty = strategy.portfolio_value / price
-        alpaca_trade("TQQQ", "buy", qty)
+        alpaca_trade("TQQQ", "buy", strategy.portfolio_value / price)
 
     elif signal == "SQQQ":
-        qty = strategy.portfolio_value / price
-        alpaca_trade("SQQQ", "buy", qty)
+        alpaca_trade("SQQQ", "buy", strategy.portfolio_value / price)
 
     else:
         print("💤 Staying in CASH.")
