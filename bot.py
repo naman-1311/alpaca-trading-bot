@@ -1,7 +1,3 @@
-
-
-
-
 import os
 import yfinance as yf
 import pandas as pd
@@ -17,11 +13,6 @@ from alpaca_trade_api import REST
 ALPACA_API_KEY = os.getenv("ALPACA_API_KEY")
 ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
 ALPACA_BASE_URL = os.getenv("ALPACA_BASE_URL")
-
-# DEBUG (temporary)
-print("API KEY PRESENT:", ALPACA_API_KEY is not None)
-print("SECRET PRESENT:", ALPACA_SECRET_KEY is not None)
-print("BASE URL:", ALPACA_BASE_URL)
 
 alpaca = REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, ALPACA_BASE_URL, api_version="v2")
 
@@ -54,6 +45,22 @@ def get_current_position():
     return positions[0].symbol
 
 
+def show_current_holdings():
+    try:
+        positions = alpaca.list_positions()
+        if len(positions) == 0:
+            print("📌 CURRENT HOLDINGS: CASH (no open positions)")
+        else:
+            print("\n📌 CURRENT HOLDINGS:")
+            for p in positions:
+                print(f"Symbol : {p.symbol}")
+                print(f"Qty    : {p.qty}")
+                print(f"AvgPx  : {p.avg_entry_price}")
+                print(f"Unrealized P/L : {p.unrealized_pl}\n")
+    except Exception as e:
+        print("❌ Error fetching holdings:", e)
+
+
 # ======================================================
 # ALPACA ORDER FUNCTION
 # ======================================================
@@ -81,8 +88,6 @@ class MA9_14_19_TradeLog:
         self.end_date = end_date or datetime.now().strftime("%Y-%m-%d")
         self.initial_capital = initial_capital
         self.portfolio_value = initial_capital
-        self.position = "CASH"
-        self.shares = 0
 
     def fetch_data(self):
         print("Fetching TQQQ & SQQQ data...")
@@ -140,6 +145,8 @@ class MA9_14_19_TradeLog:
 # LIVE EXECUTION
 # ======================================================
 def execute_today_trade(df, strategy):
+
+    show_current_holdings()
 
     if not market_is_ready(alpaca):
         return
