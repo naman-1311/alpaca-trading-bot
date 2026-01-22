@@ -2,7 +2,7 @@ name: Alpaca Trading Bot
 
 on:
   schedule:
-    - cron: "55 15 * * 1-5"   # 3:55 PM US Eastern
+    - cron: "23 13 * * *"   # 6:53 PM IST
   workflow_dispatch:
 
 jobs:
@@ -27,6 +27,5 @@ jobs:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
           ALPACA_BASE_URL: ${{ secrets.ALPACA_BASE_URL }}
-
         run: |
           python bot.py
